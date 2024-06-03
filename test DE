@@ -1,0 +1,30 @@
+import psycopg2
+from clickhouse_driver import Client
+
+#conn clickhouse
+clickhouse_client = Client('clickhouse-host', password='password')
+
+#query
+query = """
+SELECT toStartOfDay(pickup_datetime) AS pickup_date,
+       payment_type,
+       count(trip_id) AS rides,
+       floor(sum(total_amount), 2) AS amount
+FROM default.trips
+WHERE toStartOfDay(pickup_datetime) = toDate('2015-01-01')
+GROUP BY toStartOfDay(pickup_datetime), payment_type
+"""
+
+result = clickhouse_client.execute(query)
+
+#conn postgresql
+conn = psycopg2.connect("dbname='dbname' user='user' host='host' password='password'")
+cur = conn.cursor()
+
+#load postgresql
+for row in result:
+    cur.execute("INSERT INTO trips_aggregate (pickup_date, payment_type, rides, amount) VALUES (%s, %s, %s, %s)", row)
+
+conn.commit()
+cur.close()
+conn.close()
